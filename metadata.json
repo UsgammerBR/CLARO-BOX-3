@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Remix: Controle Box",
+  "description": "Gerenciamento diário de equipamentos. Sincronização automática e QR Code. Correção de ícones e base path para GitHub Pages.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
