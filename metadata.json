@@ -1,6 +1,6 @@
 {
-  "name": "Copy of Remix: Controle Box",
-  "description": "Gerenciamento diário de equipamentos. Sincronização automática e QR Code. Correção de ícones e base path para GitHub Pages.",
+  "name": "Controle de Equipamentos",
+  "description": "Sistema profissional para gestão e conferência de equipamentos com QR Code e sincronização.",
   "requestFramePermissions": [
     "camera"
   ]

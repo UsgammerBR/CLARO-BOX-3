@@ -69,11 +69,24 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    console.log("[Server] Starting Vite in development mode...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
+    
+    app.get("*", async (req, res, next) => {
+      if (req.url.startsWith('/api')) return next();
+      try {
+        const template = fs.readFileSync(path.resolve("index.html"), "utf-8");
+        const html = await vite.transformIndexHtml(req.url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     // Production static serving
     app.use(express.static("dist"));

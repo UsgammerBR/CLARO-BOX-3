@@ -165,9 +165,9 @@ export const IconStack = ({ className = 'w-6 h-6' }: { className?: string }) => 
 
 export const IconBox = ({ className = 'w-6 h-6' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} width="24" height="24">
-    <rect x="3" y="7" width="18" height="10" rx="2" />
-    <path d="M12 12h.01M15 12h.01M18 12h.01" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M7 12h2" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="3" y="6" width="18" height="12" rx="2" />
+    <path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none" />
+    <path d="M7 18h10" strokeLinecap="round" />
   </svg>
 );
 
@@ -175,8 +175,8 @@ export const IconSpeaker = ({ className = 'w-6 h-6' }: { className?: string }) =
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} width="24" height="24">
     <rect x="4" y="4" width="16" height="16" rx="2" />
     <circle cx="12" cy="12" r="4" />
-    <circle cx="12" cy="12" r="1" />
-    <path d="M18 7h.01M18 17h.01" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M17 7h.01M7 7h.01" strokeWidth={3} strokeLinecap="round" />
   </svg>
 );
 

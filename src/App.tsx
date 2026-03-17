@@ -143,10 +143,7 @@ const AppContent = () => {
     const savedData = localStorage.getItem('equipmentData');
     if (savedData) {
         try {
-            const parsed = JSON.parse(savedData);
-            if (parsed && typeof parsed === 'object') {
-                dispatch({ type: 'SET_DATA', payload: parsed });
-            }
+            dispatch({ type: 'SET_DATA', payload: JSON.parse(savedData) });
         } catch (e) {
             console.error("Failed to parse equipmentData", e);
         }
@@ -344,7 +341,7 @@ const AppContent = () => {
   }, [appData, currentDate]);
 
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim() || !appData || typeof appData !== 'object') return [];
+    if (!searchQuery.trim()) return [];
     const results: { date: string; category: EquipmentCategory; item: EquipmentItem }[] = [];
     Object.entries(appData).forEach(([date, dayData]) => {
       if (!dayData) return;
@@ -871,23 +868,17 @@ const AppContent = () => {
                                         const imgH = imgProps.height;
                                         const ratio = imgW / imgH;
                                         
-                                        // Target area is a circle at (25, 20) with radius 15
-                                        // We want to cover a 30x30 square centered at (25, 20)
-                                        
                                         doc.saveGraphicsState();
-                                        // Create circular clipping path
                                         doc.circle(25, 20, 15, 'F');
                                         doc.clip();
                                         
                                         let drawW, drawH, x, y;
                                         if (ratio > 1) {
-                                            // Landscape: height is the constraint
                                             drawH = 30;
                                             drawW = 30 * ratio;
                                             x = 25 - (drawW / 2);
                                             y = 5;
                                         } else {
-                                            // Portrait or square: width is the constraint
                                             drawW = 30;
                                             drawH = 30 / ratio;
                                             x = 10;
@@ -897,7 +888,6 @@ const AppContent = () => {
                                         doc.addImage(userProfile.profileImage, 'JPEG', x, y, drawW, drawH, undefined, 'FAST');
                                         doc.restoreGraphicsState();
                                         
-                                        // Add a subtle border over the clip
                                         doc.setDrawColor(255, 255, 255);
                                         doc.setLineWidth(0.5);
                                         doc.circle(25, 20, 15, 'S');
@@ -920,99 +910,80 @@ const AppContent = () => {
                                 doc.setFont('helvetica', 'bold');
                                 doc.text(`${monthName} ${currentDate.getFullYear()}`, 115, 36, { align: 'center' });
 
-                                // Content
-                                doc.setTextColor(15, 23, 42);
-                                let y = 50;
-                                const sortedDates = Object.keys(appData).sort();
-                                
-                                // Calculate Totals for Summary
-                                const monthlyTotals: Record<string, number> = {};
+                                // Category Summary at Top (Balloons)
+                                let currentX = 15;
                                 CATEGORIES.forEach(cat => {
-                                    let count = 0;
-                                    sortedDates.forEach(dateStr => {
-                                        const d = new Date(dateStr + 'T12:00:00');
-                                        if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
-                                            count += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
-                                        }
-                                    });
-                                    monthlyTotals[cat] = count;
+                                    const count = categoryTotals[cat];
+                                    doc.setFillColor(241, 245, 249);
+                                    doc.roundedRect(currentX, 45, 35, 15, 3, 3, 'F');
+                                    
+                                    doc.setTextColor(100, 116, 139);
+                                    doc.setFontSize(6);
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.text(cat, currentX + 17.5, 50, { align: 'center' });
+                                    
+                                    doc.setTextColor(37, 99, 235);
+                                    doc.setFontSize(10);
+                                    doc.text(String(count), currentX + 17.5, 56, { align: 'center' });
+                                    
+                                    currentX += 38;
                                 });
 
-                                // Category Summary (Balloons)
-                                doc.setFontSize(10);
+                                // Productivity Chart (Sorted by Volume)
+                                let y = 75;
+                                doc.setTextColor(15, 23, 42);
+                                doc.setFontSize(11);
                                 doc.setFont('helvetica', 'bold');
-                                doc.text('RESUMO POR CATEGORIA', 15, y);
+                                doc.text('RANKING DE PRODUTIVIDADE DIÁRIA', 15, y);
                                 y += 8;
 
-                                const itemWidth = 35;
-                                CATEGORIES.forEach((cat, index) => {
-                                    const x = 15 + (index * itemWidth);
-                                    if (x + itemWidth > 200) return; // Basic overflow check
-
-                                    // Draw "Tab"
-                                    doc.setFillColor(241, 245, 249);
-                                    doc.roundedRect(x, y, 30, 15, 3, 3, 'F');
-                                    
-                                    doc.setFontSize(7);
-                                    doc.setTextColor(100, 116, 139);
-                                    doc.text(cat.toUpperCase(), x + 15, y + 11, { align: 'center' });
-
-                                    // Draw Balloon
-                                    doc.setFillColor(59, 130, 246);
-                                    doc.circle(x + 28, y + 2, 4, 'F');
-                                    doc.setTextColor(255, 255, 255);
-                                    doc.setFontSize(6);
-                                    doc.text(String(monthlyTotals[cat]), x + 28, y + 2.5, { align: 'center' });
-                                });
-                                y += 25;
-
-                                // Productivity Chart
-                                const dailyProductivity: { date: string, count: number }[] = [];
-                                sortedDates.forEach(dateStr => {
-                                    const d = new Date(dateStr + 'T12:00:00');
-                                    if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
-                                        let dayCount = 0;
-                                        CATEGORIES.forEach(cat => {
-                                            dayCount += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
-                                        });
-                                        if (dayCount > 0) {
-                                            dailyProductivity.push({ date: dateStr, count: dayCount });
-                                        }
-                                    }
-                                });
-                                dailyProductivity.sort((a, b) => b.count - a.count);
+                                const dailyProductivity = Object.entries(appData)
+                                    .filter(([dateStr]) => {
+                                        const d = new Date(dateStr + 'T12:00:00');
+                                        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+                                    })
+                                    .map(([dateStr, dayData]) => {
+                                        const count = dayData ? Object.values(dayData).flat().filter(isItemActive).length : 0;
+                                        return { date: dateStr, count };
+                                    })
+                                    .filter(d => d.count > 0)
+                                    .sort((a, b) => b.count - a.count);
 
                                 if (dailyProductivity.length > 0) {
-                                    doc.setTextColor(15, 23, 42);
-                                    doc.setFontSize(10);
-                                    doc.setFont('helvetica', 'bold');
-                                    doc.text('RANKING DE PRODUTIVIDADE (DIAS)', 15, y);
-                                    y += 8;
-
-                                    const chartX = 15;
-                                    const maxBarWidth = 150;
-                                    const maxCount = Math.max(...dailyProductivity.map(p => p.count));
-
-                                    dailyProductivity.slice(0, 10).forEach((p, i) => {
-                                        const barWidth = (p.count / maxCount) * maxBarWidth;
-                                        const d = new Date(p.date + 'T12:00:00');
+                                    const maxCount = dailyProductivity[0].count;
+                                    dailyProductivity.slice(0, 10).forEach((dp, idx) => {
+                                        const d = new Date(dp.date + 'T12:00:00');
+                                        const barWidth = (dp.count / maxCount) * 140;
                                         
-                                        doc.setFontSize(7);
+                                        doc.setFontSize(8);
                                         doc.setFont('helvetica', 'normal');
-                                        doc.text(`${d.getDate()}/${d.getMonth()+1}`, chartX, y + 4);
+                                        doc.text(d.toLocaleDateString('pt-BR'), 15, y + 4);
                                         
-                                        doc.setFillColor(219, 234, 254); // Lighter blue instead of alpha
-                                        doc.rect(chartX + 12, y, maxBarWidth, 5, 'F');
+                                        doc.setFillColor(59, 130, 246, 0.2);
+                                        doc.rect(35, y, 140, 6, 'F');
                                         doc.setFillColor(59, 130, 246);
-                                        doc.rect(chartX + 12, y, barWidth, 5, 'F');
+                                        doc.rect(35, y, barWidth, 6, 'F');
                                         
                                         doc.setFont('helvetica', 'bold');
-                                        doc.text(String(p.count), chartX + 12 + barWidth + 2, y + 4);
-                                        y += 7;
+                                        doc.text(String(dp.count), 180, y + 4);
+                                        y += 8;
                                     });
-                                    y += 10;
+                                } else {
+                                    doc.setFont('helvetica', 'normal');
+                                    doc.setFontSize(9);
+                                    doc.text('Sem dados de produtividade para este período.', 15, y + 4);
+                                    y += 8;
                                 }
 
+                                // Detailed Content
+                                y += 10;
+                                doc.setFontSize(11);
+                                doc.setFont('helvetica', 'bold');
+                                doc.text('DETALHAMENTO DIÁRIO', 15, y);
+                                y += 8;
+
+                                const sortedDates = Object.keys(appData).sort();
+                                
                                 sortedDates.forEach(dateStr => {
                                     const d = new Date(dateStr + 'T12:00:00');
                                     if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
@@ -1061,18 +1032,12 @@ const AppContent = () => {
                                 doc.rect(10, y, 190, 10, 'F');
                                 doc.setTextColor(255, 255, 255);
                                 doc.setFontSize(11);
-                                doc.text('RESUMO MENSAL', 105, y + 7, { align: 'center' });
+                                doc.text('RESUMO MENSAL FINAL', 105, y + 7, { align: 'center' });
                                 y += 15;
                                 
                                 doc.setTextColor(15, 23, 42);
                                 CATEGORIES.forEach(cat => {
-                                    let count = 0;
-                                    sortedDates.forEach(dateStr => {
-                                        const d = new Date(dateStr + 'T12:00:00');
-                                        if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
-                                            count += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
-                                        }
-                                    });
+                                    const count = categoryTotals[cat];
                                     doc.text(`${cat}:`, 20, y);
                                     doc.text(`${count} itens`, 180, y, { align: 'right' });
                                     y += 7;

@@ -36,12 +36,13 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
     };
 
     const handleContractPaste = (e: React.ClipboardEvent) => {
-        e.preventDefault();
-        const pastedData = e.clipboardData.getData('text').trim().slice(0, 10);
+        const pastedData = e.clipboardData.getData('text').slice(0, 10);
         onUpdate({ ...item, contract: pastedData });
-        setTimeout(() => {
-            serialRef.current?.focus();
-        }, 10);
+        if (pastedData.length === 10) {
+            setTimeout(() => {
+                serialRef.current?.focus();
+            }, 50);
+        }
     };
 
     const finishItem = () => {
@@ -65,12 +66,13 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
     };
 
     const handleSerialPaste = (e: React.ClipboardEvent) => {
-        e.preventDefault();
-        const pastedData = e.clipboardData.getData('text').trim().slice(0, 20);
+        const pastedData = e.clipboardData.getData('text').slice(0, 20);
         onUpdate({ ...item, serial: pastedData });
-        setTimeout(() => {
-            finishItem();
-        }, 10);
+        if (pastedData.length === 20) {
+            setTimeout(() => {
+                finishItem();
+            }, 50);
+        }
     };
 
     const variants = {
