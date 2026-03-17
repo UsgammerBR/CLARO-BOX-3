@@ -857,62 +857,56 @@ const AppContent = () => {
                                 const monthName = currentDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
                                 
                                 // Header
+                                const hasProfileImage = !!userProfile.profileImage;
+                                const headerHeight = hasProfileImage ? 45 : 35;
                                 doc.setFillColor(15, 23, 42);
-                                doc.rect(0, 0, 210, 40, 'F');
+                                doc.rect(0, 0, 210, headerHeight, 'F');
                                 
                                 // Profile Image in PDF
-                                if (userProfile.profileImage) {
+                                if (hasProfileImage) {
                                     try {
-                                        const imgProps = doc.getImageProperties(userProfile.profileImage);
+                                        const imgProps = doc.getImageProperties(userProfile.profileImage!);
                                         const imgW = imgProps.width;
                                         const imgH = imgProps.height;
                                         const ratio = imgW / imgH;
                                         
-                                        doc.saveGraphicsState();
-                                        doc.circle(25, 20, 15, 'F');
-                                        doc.clip();
-                                        
                                         let drawW, drawH, x, yImg;
                                         if (ratio > 1) {
-                                            drawH = 30;
-                                            drawW = 30 * ratio;
-                                            x = 25 - (drawW / 2);
-                                            yImg = 5;
-                                        } else {
-                                            drawW = 30;
-                                            drawH = 30 / ratio;
+                                            drawW = 35;
+                                            drawH = 35 / ratio;
                                             x = 10;
-                                            yImg = 20 - (drawH / 2);
+                                            yImg = (headerHeight / 2) - (drawH / 2);
+                                        } else {
+                                            drawH = 35;
+                                            drawW = 35 * ratio;
+                                            x = 27.5 - (drawW / 2);
+                                            yImg = (headerHeight / 2) - (drawH / 2);
                                         }
                                         
-                                        doc.addImage(userProfile.profileImage, 'JPEG', x, yImg, drawW, drawH, undefined, 'FAST');
-                                        doc.restoreGraphicsState();
-                                        
-                                        doc.setDrawColor(255, 255, 255);
-                                        doc.setLineWidth(0.5);
-                                        doc.circle(25, 20, 15, 'S');
+                                        doc.addImage(userProfile.profileImage!, 'JPEG', x, yImg, drawW, drawH, undefined, 'FAST');
                                     } catch (e) {
                                         console.error("Erro ao adicionar imagem ao PDF", e);
                                     }
                                 }
 
+                                const textX = hasProfileImage ? 125 : 105;
                                 doc.setTextColor(255, 255, 255);
-                                doc.setFontSize(22);
+                                doc.setFontSize(20);
                                 doc.setFont('helvetica', 'bold');
-                                doc.text('RELATÓRIO DE EQUIPAMENTOS', 115, 18, { align: 'center' });
+                                doc.text('RELATÓRIO DE EQUIPAMENTOS', textX, 15, { align: 'center' });
                                 doc.setFontSize(10);
                                 doc.setFont('helvetica', 'normal');
-                                doc.text(`RESPONSÁVEL: ${userProfile.name.toUpperCase() || 'NÃO INFORMADO'}`, 115, 26, { align: 'center' });
+                                doc.text(`RESPONSÁVEL: ${userProfile.name.toUpperCase() || 'NÃO INFORMADO'}`, textX, 23, { align: 'center' });
                                 if (userProfile.cpf) {
-                                    doc.text(`CPF: ${userProfile.cpf}`, 115, 30, { align: 'center' });
+                                    doc.text(`CPF: ${userProfile.cpf}`, textX, 28, { align: 'center' });
                                 }
                                 doc.setFontSize(12);
                                 doc.setFont('helvetica', 'bold');
-                                doc.text(`${monthName} ${currentDate.getFullYear()}`, 115, 36, { align: 'center' });
+                                doc.text(`${monthName} ${currentDate.getFullYear()}`, textX, 35, { align: 'center' });
 
                                 // Category Tabs with Totals at top (Grid style like app)
                                 let tabX = 12;
-                                let tabY = 45;
+                                let tabY = headerHeight + 5;
                                 CATEGORIES.forEach((cat, idx) => {
                                     const count = categoryTotals[cat];
                                     
@@ -969,7 +963,7 @@ const AppContent = () => {
 
                                 // Content
                                 doc.setTextColor(15, 23, 42);
-                                let y = tabY + 20;
+                                let y = tabY + 15;
                                 const sortedDates = Object.keys(appData).sort();
                                 
                                 sortedDates.forEach(dateStr => {
