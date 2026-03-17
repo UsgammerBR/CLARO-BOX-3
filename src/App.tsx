@@ -614,8 +614,8 @@ const AppContent = () => {
           <EquipmentSection 
             category={activeCategory} 
             items={collapsedCategories[activeCategory] 
-                ? [currentDayData[activeCategory][currentDayData[activeCategory].length - 1]]
-                : currentDayData[activeCategory]
+                ? (currentDayData[activeCategory]?.length > 0 ? [currentDayData[activeCategory][currentDayData[activeCategory].length - 1]] : [])
+                : (currentDayData[activeCategory] || [])
             } 
             onUpdate={(item: any) => {
                 addToHistory(appData);
@@ -872,20 +872,20 @@ const AppContent = () => {
                                         doc.circle(25, 20, 15, 'F');
                                         doc.clip();
                                         
-                                        let drawW, drawH, x, y;
+                                        let drawW, drawH, x, yImg;
                                         if (ratio > 1) {
                                             drawH = 30;
                                             drawW = 30 * ratio;
                                             x = 25 - (drawW / 2);
-                                            y = 5;
+                                            yImg = 5;
                                         } else {
                                             drawW = 30;
                                             drawH = 30 / ratio;
                                             x = 10;
-                                            y = 20 - (drawH / 2);
+                                            yImg = 20 - (drawH / 2);
                                         }
                                         
-                                        doc.addImage(userProfile.profileImage, 'JPEG', x, y, drawW, drawH, undefined, 'FAST');
+                                        doc.addImage(userProfile.profileImage, 'JPEG', x, yImg, drawW, drawH, undefined, 'FAST');
                                         doc.restoreGraphicsState();
                                         
                                         doc.setDrawColor(255, 255, 255);
@@ -910,78 +910,66 @@ const AppContent = () => {
                                 doc.setFont('helvetica', 'bold');
                                 doc.text(`${monthName} ${currentDate.getFullYear()}`, 115, 36, { align: 'center' });
 
-                                // Category Summary at Top (Balloons)
-                                let currentX = 15;
-                                CATEGORIES.forEach(cat => {
+                                // Category Tabs with Totals at top (Grid style like app)
+                                let tabX = 12;
+                                let tabY = 45;
+                                CATEGORIES.forEach((cat, idx) => {
                                     const count = categoryTotals[cat];
-                                    doc.setFillColor(241, 245, 249);
-                                    doc.roundedRect(currentX, 45, 35, 15, 3, 3, 'F');
                                     
+                                    // Card background
+                                    doc.setFillColor(248, 250, 252);
+                                    doc.roundedRect(tabX, tabY, 30, 15, 3, 3, 'F');
+                                    doc.setDrawColor(226, 232, 240);
+                                    doc.roundedRect(tabX, tabY, 30, 15, 3, 3, 'S');
+                                    
+                                    // Icon placeholder (small square)
+                                    doc.setFillColor(255, 255, 255);
+                                    doc.roundedRect(tabX + 10, tabY + 2, 10, 6, 1, 1, 'F');
+                                    
+                                    // Draw simple icon representation
+                                    doc.setDrawColor(71, 85, 105);
+                                    doc.setLineWidth(0.1);
+                                    if (cat === EquipmentCategory.BOX) {
+                                        doc.rect(tabX + 12, tabY + 3.5, 6, 3, 'S');
+                                    } else if (cat === EquipmentCategory.CONTROLE) {
+                                        doc.rect(tabX + 13.5, tabY + 2.5, 3, 5, 'S');
+                                    } else if (cat === EquipmentCategory.BOX_SOUND) {
+                                        doc.rect(tabX + 12, tabY + 3, 6, 4, 'S');
+                                        doc.circle(tabX + 15, tabY + 5, 1, 'S');
+                                    } else if (cat === EquipmentCategory.CAMERA) {
+                                        doc.circle(tabX + 15, tabY + 5, 2, 'S');
+                                        doc.rect(tabX + 12, tabY + 3, 6, 4, 'S');
+                                    } else if (cat === EquipmentCategory.CHIP) {
+                                        doc.rect(tabX + 13, tabY + 3, 4, 5, 'S');
+                                        doc.line(tabX + 13, tabY + 4, tabX + 17, tabY + 4);
+                                    } else {
+                                        doc.line(tabX + 15, tabY + 3, tabX + 15, tabY + 7);
+                                        doc.line(tabX + 13, tabY + 5, tabX + 17, tabY + 5);
+                                    }
+
+                                    // Category Name
                                     doc.setTextColor(100, 116, 139);
-                                    doc.setFontSize(6);
+                                    doc.setFontSize(5);
                                     doc.setFont('helvetica', 'bold');
-                                    doc.text(cat, currentX + 17.5, 50, { align: 'center' });
+                                    doc.text(cat.substring(0, 15), tabX + 15, tabY + 11, { align: 'center' });
                                     
-                                    doc.setTextColor(37, 99, 235);
-                                    doc.setFontSize(10);
-                                    doc.text(String(count), currentX + 17.5, 56, { align: 'center' });
+                                    // Count Badge (Red as requested)
+                                    doc.setFillColor(239, 68, 68);
+                                    doc.circle(tabX + 28, tabY + 2, 3, 'F');
+                                    doc.setTextColor(255, 255, 255);
+                                    doc.setFontSize(5);
+                                    doc.text(count.toString(), tabX + 28, tabY + 3, { align: 'center' });
                                     
-                                    currentX += 38;
+                                    tabX += 32;
+                                    if ((idx + 1) % 6 === 0) {
+                                        tabX = 12;
+                                        tabY += 18;
+                                    }
                                 });
 
-                                // Productivity Chart (Sorted by Volume)
-                                let y = 75;
+                                // Content
                                 doc.setTextColor(15, 23, 42);
-                                doc.setFontSize(11);
-                                doc.setFont('helvetica', 'bold');
-                                doc.text('RANKING DE PRODUTIVIDADE DIÁRIA', 15, y);
-                                y += 8;
-
-                                const dailyProductivity = Object.entries(appData)
-                                    .filter(([dateStr]) => {
-                                        const d = new Date(dateStr + 'T12:00:00');
-                                        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
-                                    })
-                                    .map(([dateStr, dayData]) => {
-                                        const count = dayData ? Object.values(dayData).flat().filter(isItemActive).length : 0;
-                                        return { date: dateStr, count };
-                                    })
-                                    .filter(d => d.count > 0)
-                                    .sort((a, b) => b.count - a.count);
-
-                                if (dailyProductivity.length > 0) {
-                                    const maxCount = dailyProductivity[0].count;
-                                    dailyProductivity.slice(0, 10).forEach((dp, idx) => {
-                                        const d = new Date(dp.date + 'T12:00:00');
-                                        const barWidth = (dp.count / maxCount) * 140;
-                                        
-                                        doc.setFontSize(8);
-                                        doc.setFont('helvetica', 'normal');
-                                        doc.text(d.toLocaleDateString('pt-BR'), 15, y + 4);
-                                        
-                                        doc.setFillColor(59, 130, 246, 0.2);
-                                        doc.rect(35, y, 140, 6, 'F');
-                                        doc.setFillColor(59, 130, 246);
-                                        doc.rect(35, y, barWidth, 6, 'F');
-                                        
-                                        doc.setFont('helvetica', 'bold');
-                                        doc.text(String(dp.count), 180, y + 4);
-                                        y += 8;
-                                    });
-                                } else {
-                                    doc.setFont('helvetica', 'normal');
-                                    doc.setFontSize(9);
-                                    doc.text('Sem dados de produtividade para este período.', 15, y + 4);
-                                    y += 8;
-                                }
-
-                                // Detailed Content
-                                y += 10;
-                                doc.setFontSize(11);
-                                doc.setFont('helvetica', 'bold');
-                                doc.text('DETALHAMENTO DIÁRIO', 15, y);
-                                y += 8;
-
+                                let y = tabY + 20;
                                 const sortedDates = Object.keys(appData).sort();
                                 
                                 sortedDates.forEach(dateStr => {
@@ -1026,19 +1014,93 @@ const AppContent = () => {
                                     }
                                 });
 
+                                // Productivity Chart
+                                const dailyProductivity = Object.entries(appData)
+                                    .filter(([dateStr]) => {
+                                        const d = new Date(dateStr + 'T12:00:00');
+                                        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+                                    })
+                                    .map(([dateStr, day]) => {
+                                        const count = Object.values(day).flat().filter(isItemActive).length;
+                                        return { date: dateStr, count };
+                                    })
+                                    .filter(d => d.count > 0)
+                                    .sort((a, b) => b.count - a.count);
+
+                                if (dailyProductivity.length > 0) {
+                                    if (y > 200) { doc.addPage(); y = 20; }
+                                    doc.setFillColor(15, 23, 42);
+                                    doc.rect(10, y, 190, 8, 'F');
+                                    doc.setTextColor(255, 255, 255);
+                                    doc.setFontSize(10);
+                                    doc.text('PRODUTIVIDADE POR DIA (MAIOR PARA MENOR)', 105, y + 6, { align: 'center' });
+                                    y += 15;
+                                    
+                                    const maxCount = Math.max(...dailyProductivity.map(d => d.count));
+                                    const chartWidth = 140;
+                                    
+                                    dailyProductivity.forEach(dp => {
+                                        if (y > 280) { doc.addPage(); y = 20; }
+                                        const barWidth = (dp.count / maxCount) * chartWidth;
+                                        const d = new Date(dp.date + 'T12:00:00');
+                                        
+                                        doc.setTextColor(15, 23, 42);
+                                        doc.setFontSize(8);
+                                        doc.text(`${d.getDate()}/${d.getMonth() + 1}`, 15, y + 4);
+                                        
+                                        // Gradient effect for bars
+                                        for (let i = 0; i < 10; i++) {
+                                            const stepWidth = barWidth / 10;
+                                            const opacity = 1 - (i * 0.05);
+                                            doc.setFillColor(59, 130, 246);
+                                            // jsPDF doesn't have native alpha for fill easily without GState, 
+                                            // so we'll just use a slightly lighter color
+                                            const r = 59 + (i * 10);
+                                            const g = 130 + (i * 5);
+                                            const b = 246;
+                                            doc.setFillColor(Math.min(r, 220), Math.min(g, 240), b);
+                                            doc.rect(30 + (i * stepWidth), y, stepWidth, 6, 'F');
+                                        }
+                                        
+                                        doc.setTextColor(15, 23, 42);
+                                        doc.text(dp.count.toString(), 35 + barWidth, y + 4);
+                                        y += 10;
+                                    });
+                                    y += 10;
+                                }
+
                                 // Footer Summary
                                 if (y > 240) { doc.addPage(); y = 20; }
                                 doc.setFillColor(59, 130, 246);
                                 doc.rect(10, y, 190, 10, 'F');
                                 doc.setTextColor(255, 255, 255);
                                 doc.setFontSize(11);
-                                doc.text('RESUMO MENSAL FINAL', 105, y + 7, { align: 'center' });
+                                doc.text('RESUMO MENSAL', 105, y + 7, { align: 'center' });
                                 y += 15;
                                 
                                 doc.setTextColor(15, 23, 42);
                                 CATEGORIES.forEach(cat => {
-                                    const count = categoryTotals[cat];
-                                    doc.text(`${cat}:`, 20, y);
+                                    let count = 0;
+                                    sortedDates.forEach(dateStr => {
+                                        const d = new Date(dateStr + 'T12:00:00');
+                                        if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
+                                            count += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
+                                        }
+                                    });
+                                    
+                                    // Icon for summary
+                                    doc.setDrawColor(100, 116, 139);
+                                    doc.setLineWidth(0.1);
+                                    if (cat === EquipmentCategory.BOX) doc.rect(20, y - 3, 4, 2, 'S');
+                                    else if (cat === EquipmentCategory.CONTROLE) doc.rect(21, y - 4, 2, 4, 'S');
+                                    else if (cat === EquipmentCategory.BOX_SOUND) { doc.rect(20, y - 4, 4, 3, 'S'); doc.circle(22, y - 2.5, 0.5, 'S'); }
+                                    else if (cat === EquipmentCategory.CAMERA) { doc.circle(22, y - 2, 1.5, 'S'); doc.rect(20, y - 4, 4, 3, 'S'); }
+                                    else if (cat === EquipmentCategory.CHIP) { doc.rect(21, y - 4, 2, 3, 'S'); }
+                                    else { doc.line(22, y - 4, 22, y); doc.line(20, y - 2, 24, y - 2); }
+
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.text(`${cat}:`, 30, y);
+                                    doc.setFont('helvetica', 'normal');
                                     doc.text(`${count} itens`, 180, y, { align: 'right' });
                                     y += 7;
                                 });

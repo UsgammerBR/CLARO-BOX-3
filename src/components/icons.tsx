@@ -165,18 +165,18 @@ export const IconStack = ({ className = 'w-6 h-6' }: { className?: string }) => 
 
 export const IconBox = ({ className = 'w-6 h-6' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} width="24" height="24">
-    <rect x="3" y="6" width="18" height="12" rx="2" />
-    <path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none" />
-    <path d="M7 18h10" strokeLinecap="round" />
+    <rect x="3" y="7" width="18" height="10" rx="2" />
+    <path d="M7 12h2m3 0h5" strokeLinecap="round" />
+    <circle cx="18" cy="12" r="0.5" fill="currentColor" />
   </svg>
 );
 
 export const IconSpeaker = ({ className = 'w-6 h-6' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} width="24" height="24">
-    <rect x="4" y="4" width="16" height="16" rx="2" />
-    <circle cx="12" cy="12" r="4" />
-    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-    <path d="M17 7h.01M7 7h.01" strokeWidth={3} strokeLinecap="round" />
+    <rect x="5" y="3" width="14" height="18" rx="2" />
+    <circle cx="12" cy="14" r="3" />
+    <circle cx="12" cy="14" r="1" />
+    <circle cx="12" cy="7" r="1.5" />
   </svg>
 );
 

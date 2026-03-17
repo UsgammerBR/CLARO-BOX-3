@@ -25,27 +25,33 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
 }) => {
     const serialRef = useRef<HTMLInputElement>(null);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const isFinishing = useRef(false);
 
     const handleContractChange = (val: string) => {
+        const prevLen = item.contract?.length || 0;
         if (val.length <= 10) {
             onUpdate({ ...item, contract: val });
-            if (val.length === 10) {
-                serialRef.current?.focus();
+            // Detect paste or max length: jump in length or reaching 10
+            if (val.length === 10 || (val.length > prevLen + 1)) {
+                setTimeout(() => {
+                    serialRef.current?.focus();
+                }, 10);
             }
         }
     };
 
     const handleContractPaste = (e: React.ClipboardEvent) => {
-        const pastedData = e.clipboardData.getData('text').slice(0, 10);
+        const pastedData = e.clipboardData.getData('text').substring(0, 10);
         onUpdate({ ...item, contract: pastedData });
-        if (pastedData.length === 10) {
-            setTimeout(() => {
-                serialRef.current?.focus();
-            }, 50);
-        }
+        setTimeout(() => {
+            serialRef.current?.focus();
+        }, 30);
     };
 
     const finishItem = () => {
+        if (isFinishing.current) return;
+        isFinishing.current = true;
+
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
         }
@@ -53,26 +59,29 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
         setIsCollapsed(true);
         setTimeout(() => {
             onAddItem();
+            isFinishing.current = false;
         }, 300);
     };
 
     const handleSerialChange = (val: string) => {
+        const prevLen = item.serial?.length || 0;
         if (val.length <= 20) {
             onUpdate({ ...item, serial: val });
-            if (val.length === 20) {
-                finishItem();
+            // Detect paste or max length: jump in length or reaching 20
+            if (val.length === 20 || (val.length > prevLen + 1)) {
+                setTimeout(() => {
+                    finishItem();
+                }, 10);
             }
         }
     };
 
     const handleSerialPaste = (e: React.ClipboardEvent) => {
-        const pastedData = e.clipboardData.getData('text').slice(0, 20);
+        const pastedData = e.clipboardData.getData('text').substring(0, 20);
         onUpdate({ ...item, serial: pastedData });
-        if (pastedData.length === 20) {
-            setTimeout(() => {
-                finishItem();
-            }, 50);
-        }
+        setTimeout(() => {
+            finishItem();
+        }, 30);
     };
 
     const variants = {
