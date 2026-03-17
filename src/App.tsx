@@ -143,7 +143,10 @@ const AppContent = () => {
     const savedData = localStorage.getItem('equipmentData');
     if (savedData) {
         try {
-            dispatch({ type: 'SET_DATA', payload: JSON.parse(savedData) });
+            const parsed = JSON.parse(savedData);
+            if (parsed && typeof parsed === 'object') {
+                dispatch({ type: 'SET_DATA', payload: parsed });
+            }
         } catch (e) {
             console.error("Failed to parse equipmentData", e);
         }
@@ -341,7 +344,7 @@ const AppContent = () => {
   }, [appData, currentDate]);
 
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
+    if (!searchQuery.trim() || !appData || typeof appData !== 'object') return [];
     const results: { date: string; category: EquipmentCategory; item: EquipmentItem }[] = [];
     Object.entries(appData).forEach(([date, dayData]) => {
       if (!dayData) return;
@@ -922,6 +925,94 @@ const AppContent = () => {
                                 let y = 50;
                                 const sortedDates = Object.keys(appData).sort();
                                 
+                                // Calculate Totals for Summary
+                                const monthlyTotals: Record<string, number> = {};
+                                CATEGORIES.forEach(cat => {
+                                    let count = 0;
+                                    sortedDates.forEach(dateStr => {
+                                        const d = new Date(dateStr + 'T12:00:00');
+                                        if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
+                                            count += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
+                                        }
+                                    });
+                                    monthlyTotals[cat] = count;
+                                });
+
+                                // Category Summary (Balloons)
+                                doc.setFontSize(10);
+                                doc.setFont('helvetica', 'bold');
+                                doc.text('RESUMO POR CATEGORIA', 15, y);
+                                y += 8;
+
+                                const itemWidth = 35;
+                                CATEGORIES.forEach((cat, index) => {
+                                    const x = 15 + (index * itemWidth);
+                                    if (x + itemWidth > 200) return; // Basic overflow check
+
+                                    // Draw "Tab"
+                                    doc.setFillColor(241, 245, 249);
+                                    doc.roundedRect(x, y, 30, 15, 3, 3, 'F');
+                                    
+                                    doc.setFontSize(7);
+                                    doc.setTextColor(100, 116, 139);
+                                    doc.text(cat.toUpperCase(), x + 15, y + 11, { align: 'center' });
+
+                                    // Draw Balloon
+                                    doc.setFillColor(59, 130, 246);
+                                    doc.circle(x + 28, y + 2, 4, 'F');
+                                    doc.setTextColor(255, 255, 255);
+                                    doc.setFontSize(6);
+                                    doc.text(String(monthlyTotals[cat]), x + 28, y + 2.5, { align: 'center' });
+                                });
+                                y += 25;
+
+                                // Productivity Chart
+                                const dailyProductivity: { date: string, count: number }[] = [];
+                                sortedDates.forEach(dateStr => {
+                                    const d = new Date(dateStr + 'T12:00:00');
+                                    if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
+                                        let dayCount = 0;
+                                        CATEGORIES.forEach(cat => {
+                                            dayCount += (appData[dateStr]?.[cat] || []).filter(isItemActive).length;
+                                        });
+                                        if (dayCount > 0) {
+                                            dailyProductivity.push({ date: dateStr, count: dayCount });
+                                        }
+                                    }
+                                });
+                                dailyProductivity.sort((a, b) => b.count - a.count);
+
+                                if (dailyProductivity.length > 0) {
+                                    doc.setTextColor(15, 23, 42);
+                                    doc.setFontSize(10);
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.text('RANKING DE PRODUTIVIDADE (DIAS)', 15, y);
+                                    y += 8;
+
+                                    const chartX = 15;
+                                    const maxBarWidth = 150;
+                                    const maxCount = Math.max(...dailyProductivity.map(p => p.count));
+
+                                    dailyProductivity.slice(0, 10).forEach((p, i) => {
+                                        const barWidth = (p.count / maxCount) * maxBarWidth;
+                                        const d = new Date(p.date + 'T12:00:00');
+                                        
+                                        doc.setFontSize(7);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(`${d.getDate()}/${d.getMonth()+1}`, chartX, y + 4);
+                                        
+                                        doc.setFillColor(219, 234, 254); // Lighter blue instead of alpha
+                                        doc.rect(chartX + 12, y, maxBarWidth, 5, 'F');
+                                        doc.setFillColor(59, 130, 246);
+                                        doc.rect(chartX + 12, y, barWidth, 5, 'F');
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text(String(p.count), chartX + 12 + barWidth + 2, y + 4);
+                                        y += 7;
+                                    });
+                                    y += 10;
+                                }
+
                                 sortedDates.forEach(dateStr => {
                                     const d = new Date(dateStr + 'T12:00:00');
                                     if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) {
