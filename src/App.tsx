@@ -68,12 +68,14 @@ const AppContent = () => {
     localStorage.setItem('equipment_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  const addNotification = (type: string, details: string) => {
+  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', metadata?: any) => {
     const newNotif = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now(),
+        title,
+        message,
         type,
-        details
+        metadata
     };
     setNotifications(prev => [newNotif, ...prev].slice(0, 50));
     setHasNewNotifications(true);
@@ -126,8 +128,7 @@ const AppContent = () => {
     return initial;
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   
   const isChristmas = isChristmasPeriod();
   const formattedDate = getFormattedDate(currentDate);
@@ -143,75 +144,41 @@ const AppContent = () => {
     const savedData = localStorage.getItem('equipmentData');
     if (savedData) {
         try {
-            dispatch({ type: 'SET_DATA', payload: JSON.parse(savedData) });
+            const parsed = JSON.parse(savedData);
+            if (parsed && typeof parsed === 'object') {
+                dispatch({ type: 'SET_DATA', payload: parsed });
+            }
         } catch (e) {
             console.error("Failed to parse equipmentData", e);
         }
     }
-    
-    // Auto-shrink existing large profile images
-    if (userProfile.profileImage && userProfile.profileImage.length > 50000) {
-        compressImage(userProfile.profileImage, 180, 0.5, true).then(shrunk => {
-            setUserProfile(prev => ({ ...prev, profileImage: shrunk }));
-        }).catch(err => {
-            console.error("Failed to auto-shrink profile image", err);
-            // If it's corrupted, clear it
-            if (userProfile.profileImage.startsWith('data:image') === false) {
-                setUserProfile(prev => ({ ...prev, profileImage: '' }));
+
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+        try {
+            const parsed = JSON.parse(savedProfile);
+            if (parsed && typeof parsed === 'object') {
+                setUserProfile(parsed);
             }
-        });
+        } catch (e) {
+            console.error("Failed to parse userProfile", e);
+        }
     }
 
-    const fetchServerData = async () => {
+    const savedNotifications = localStorage.getItem('notifications');
+    if (savedNotifications) {
         try {
-            const email = userProfile.email || 'default';
-            const response = await fetch(`/api/data?email=${encodeURIComponent(email)}`);
-            if (response.ok) {
-                const serverData = await response.json();
-                if (serverData && Object.keys(serverData).length > 0) {
-                    dispatch({ type: 'SET_DATA', payload: serverData });
-                    localStorage.setItem('equipmentData', JSON.stringify(serverData));
-                }
+            const parsed = JSON.parse(savedNotifications);
+            if (Array.isArray(parsed)) {
+                setNotifications(parsed);
             }
-        } catch (err) {
-            console.error("Failed to fetch from server", err);
+        } catch (e) {
+            console.error("Failed to parse notifications", e);
         }
-    };
+    }
     
-    fetchServerData();
     return () => clearTimeout(timer);
   }, []);
-
-  const syncWithServer = async () => {
-      if (!navigator.onLine) {
-          setSyncStatus('error');
-          return;
-      }
-      
-      setSyncStatus('syncing');
-      try {
-          const response = await fetch('/api/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                email: userProfile.email || 'default',
-                data: appData 
-              })
-          });
-          
-          if (response.ok) {
-              setSyncStatus('success');
-              setLastSync(new Date());
-          } else {
-              setSyncStatus('error');
-              addNotification('Erro de Sincronização', 'O servidor recusou a sincronização.');
-          }
-      } catch (err) {
-          console.error("Sync error:", err);
-          setSyncStatus('error');
-          addNotification('Erro de Sincronização', 'Não foi possível salvar os dados na nuvem.');
-      }
-  };
 
   useEffect(() => {
     if (isLoading) return;
@@ -220,8 +187,6 @@ const AppContent = () => {
     } catch (e) {
         console.error("Failed to save equipmentData to localStorage", e);
     }
-    const debounceTimer = setTimeout(syncWithServer, 2000);
-    return () => clearTimeout(debounceTimer);
   }, [appData, isLoading]);
 
   useEffect(() => {
@@ -366,9 +331,11 @@ const AppContent = () => {
         try {
             const compressed = await compressImage(data, 180, 0.5, true);
             setUserProfile(prev => ({ ...prev, profileImage: compressed }));
+            addNotification('Perfil', 'Foto de perfil atualizada');
         } catch (e) {
             console.error("Error compressing camera image", e);
             setUserProfile(prev => ({ ...prev, profileImage: data }));
+            addNotification('Perfil', 'Foto de perfil atualizada');
         }
     } else {
         const item = cameraTarget.item as EquipmentItem;
@@ -382,6 +349,11 @@ const AppContent = () => {
                     item: { ...item, serial: data } 
                 } 
             });
+            addNotification('QR Code Lido', `Serial capturado para ${cameraTarget.category}`, 'success', {
+                itemId: item.id,
+                category: cameraTarget.category,
+                date: formattedDate
+            });
         } else {
             dispatch({ 
                 type: 'UPDATE_ITEM', 
@@ -390,6 +362,11 @@ const AppContent = () => {
                     category: cameraTarget.category, 
                     item: { ...item, photos: [...item.photos, data] } 
                 } 
+            });
+            addNotification('Foto Adicionada', `Nova foto para ${cameraTarget.category}`, 'success', {
+                itemId: item.id,
+                category: cameraTarget.category,
+                date: formattedDate
             });
         }
     }
@@ -424,38 +401,8 @@ const AppContent = () => {
     }
   };
 
-  const handleImportCloud = async () => {
-    if (!userProfile.email) {
-      alert("Por favor, configure seu e-mail nas configurações para importar da nuvem.");
-      setActiveModal('settings');
-      return;
-    }
 
-    if (!confirm(`Isso irá substituir seus dados locais pelos dados salvos na nuvem para o e-mail: ${userProfile.email}. Continuar?`)) return;
-    
-    try {
-      const email = userProfile.email || 'default';
-      const response = await fetch(`/api/data?email=${encodeURIComponent(email)}`);
-      if (response.ok) {
-        const serverData = await response.json();
-        if (serverData && Object.keys(serverData).length > 0) {
-          dispatch({ type: 'SET_DATA', payload: serverData });
-          localStorage.setItem('equipmentData', JSON.stringify(serverData));
-          addNotification('Importação', 'Dados recuperados da nuvem');
-          alert("Dados importados com sucesso!");
-          setActiveModal(null);
-        } else {
-          alert(`Nenhum dado encontrado na nuvem para o e-mail: ${email}.`);
-        }
-      } else {
-        alert("Erro ao conectar com o servidor.");
-      }
-    } catch (err) {
-      alert("Erro de conexão.");
-    }
-  };
-
-  if (isLoading) return <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50 z-[100]"><LoadingBoxIcon/><p className="mt-4 font-black uppercase tracking-widest text-[10px] text-slate-400 animate-pulse">Iniciando Controle...</p></div>;
+  if (isLoading) return <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-900 z-[100]"><LoadingBoxIcon/><p className="mt-4 font-black uppercase tracking-widest text-[10px] text-white/60 animate-pulse">Iniciando Controle...</p></div>;
 
   return (
     <div className="flex flex-col min-h-screen relative w-full overflow-x-hidden bg-slate-50">
@@ -633,6 +580,7 @@ const AppContent = () => {
             selectedForDelete={selectedForDelete}
             onToggleSelect={(id: string) => setSelectedForDelete(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
             isChristmas={isChristmas}
+            highlightedItemId={highlightedItemId}
           />
 
           {collapsedCategories[activeCategory] && currentDayData[activeCategory].filter(isItemActive).length > 0 && (
@@ -858,11 +806,11 @@ const AppContent = () => {
                                 
                                 // Header
                                 const hasProfileImage = !!userProfile.profileImage;
-                                const headerHeight = hasProfileImage ? 45 : 35;
+                                const headerHeight = 45;
                                 doc.setFillColor(15, 23, 42);
                                 doc.rect(0, 0, 210, headerHeight, 'F');
                                 
-                                // Profile Image in PDF
+                                // 1. Profile Image (Left)
                                 if (hasProfileImage) {
                                     try {
                                         const imgProps = doc.getImageProperties(userProfile.profileImage!);
@@ -872,14 +820,14 @@ const AppContent = () => {
                                         
                                         let drawW, drawH, x, yImg;
                                         if (ratio > 1) {
-                                            drawW = 35;
-                                            drawH = 35 / ratio;
+                                            drawW = 30;
+                                            drawH = 30 / ratio;
                                             x = 10;
                                             yImg = (headerHeight / 2) - (drawH / 2);
                                         } else {
-                                            drawH = 35;
-                                            drawW = 35 * ratio;
-                                            x = 27.5 - (drawW / 2);
+                                            drawH = 30;
+                                            drawW = 30 * ratio;
+                                            x = 25 - (drawW / 2);
                                             yImg = (headerHeight / 2) - (drawH / 2);
                                         }
                                         
@@ -889,20 +837,32 @@ const AppContent = () => {
                                     }
                                 }
 
-                                const textX = hasProfileImage ? 125 : 105;
+                                // 2. Claro Logo (Right)
+                                const logoX = 185;
+                                const logoY = headerHeight / 2;
+                                const logoRadius = 12;
+                                doc.setFillColor(239, 68, 68); // Claro Red
+                                doc.circle(logoX, logoY, logoRadius, 'F');
                                 doc.setTextColor(255, 255, 255);
-                                doc.setFontSize(20);
+                                doc.setFontSize(8);
+                                doc.setFont('helvetica', 'bold');
+                                doc.text('Claro', logoX, logoY + 1, { align: 'center' });
+
+                                // 3. Central Text
+                                const textX = 105;
+                                doc.setTextColor(255, 255, 255);
+                                doc.setFontSize(18);
                                 doc.setFont('helvetica', 'bold');
                                 doc.text('RELATÓRIO DE EQUIPAMENTOS', textX, 15, { align: 'center' });
-                                doc.setFontSize(10);
+                                doc.setFontSize(9);
                                 doc.setFont('helvetica', 'normal');
                                 doc.text(`RESPONSÁVEL: ${userProfile.name.toUpperCase() || 'NÃO INFORMADO'}`, textX, 23, { align: 'center' });
                                 if (userProfile.cpf) {
                                     doc.text(`CPF: ${userProfile.cpf}`, textX, 28, { align: 'center' });
                                 }
-                                doc.setFontSize(12);
+                                doc.setFontSize(11);
                                 doc.setFont('helvetica', 'bold');
-                                doc.text(`${monthName} ${currentDate.getFullYear()}`, textX, 35, { align: 'center' });
+                                doc.text(`${monthName} ${currentDate.getFullYear()}`, textX, 36, { align: 'center' });
 
                                 // Category Tabs with Totals at top (Grid style like app)
                                 let tabX = 12;
@@ -1148,23 +1108,177 @@ const AppContent = () => {
                 <div className="space-y-4">
                     <div className="max-h-[350px] overflow-y-auto no-scrollbar space-y-3">
                         {notifications.length > 0 ? notifications.map(notif => (
-                            <div key={notif.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
-                                <div className={`w-2 h-2 rounded-full ${notif.type === 'Adição' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div 
+                                key={notif.id} 
+                                onClick={() => {
+                                    if (notif.metadata?.itemId) {
+                                        const { itemId, category, date } = notif.metadata;
+                                        if (date) setCurrentDate(new Date(date + 'T12:00:00'));
+                                        if (category) setActiveCategory(category);
+                                        setHighlightedItemId(itemId);
+                                        setActiveModal(null);
+                                        
+                                        // Scroll to element after a short delay
+                                        setTimeout(() => {
+                                            const element = document.getElementById(`item-${itemId}`);
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                // Clear highlight after 3 seconds
+                                                setTimeout(() => setHighlightedItemId(null), 3000);
+                                            }
+                                        }, 300);
+                                    }
+                                }}
+                                className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${notif.metadata?.itemId ? 'cursor-pointer hover:bg-slate-100 active:scale-[0.98]' : ''} ${notif.type === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}
+                            >
+                                <div className={`w-2 h-2 rounded-full ${notif.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                                 <div className="flex-1">
-                                    <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{notif.type}</span><span className="text-[8px] font-black text-slate-400">{notif.time}</span></div>
-                                    <p className="text-[11px] font-black text-slate-500">{notif.details}</p>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{notif.title}</span>
+                                        <span className="text-[8px] font-black text-slate-400">{new Date(notif.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                    <p className="text-[11px] font-black text-slate-500">{notif.message}</p>
+                                    {notif.metadata?.itemId && (
+                                        <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest mt-1 block">Toque para ver</span>
+                                    )}
                                 </div>
                             </div>
                         )) : <p className="text-center py-10 text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhuma atividade</p>}
                     </div>
                     {notifications.length > 0 && (
                         <button 
-                            onClick={() => { setNotifications([]); addNotification('Sistema', 'Histórico de atividades limpo'); }}
+                            onClick={() => { setNotifications([]); }}
                             className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-[3px] text-[10px] active:scale-95 transition-all"
                         >
                             Limpar Tudo
                         </button>
                     )}
+                </div>
+            </Modal>
+        )}
+
+        {activeModal === 'calendar' && (
+            <Modal title="Calendário" onClose={() => setActiveModal(null)}>
+                <div className="space-y-6 py-4">
+                    <div className="grid grid-cols-7 gap-1 text-center mb-4">
+                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
+                            <span key={d} className="text-[10px] font-black text-slate-400 uppercase">{d}</span>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                        {Array.from({ length: 31 }).map((_, i) => {
+                            const day = i + 1;
+                            const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                            const isSelected = currentDate.getDate() === day;
+                            const isToday = new Date().toDateString() === date.toDateString();
+                            
+                            return (
+                                <button 
+                                    key={day}
+                                    onClick={() => {
+                                        setCurrentDate(date);
+                                        setActiveModal(null);
+                                    }}
+                                    className={`aspect-square rounded-xl flex items-center justify-center text-xs font-black transition-all active:scale-90 ${
+                                        isSelected ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 
+                                        isToday ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-50 text-slate-600 border border-slate-100'
+                                    }`}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button 
+                            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+                            className="p-3 rounded-xl bg-slate-50 text-slate-400 active:scale-90 transition-all"
+                        >
+                            <IconChevronLeft className="w-5 h-5"/>
+                        </button>
+                        <span className="text-[10px] font-black text-slate-900 uppercase tracking-[4px]">
+                            {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                        </span>
+                        <button 
+                            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+                            className="p-3 rounded-xl bg-slate-50 text-slate-400 active:scale-90 transition-all"
+                        >
+                            <IconChevronRight className="w-5 h-5"/>
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+        )}
+
+        {activeModal === 'settings' && (
+            <Modal title="Configurações" onClose={() => setActiveModal(null)}>
+                <div className="space-y-6 py-4">
+                    <div className="flex flex-col items-center gap-4 mb-8">
+                        <div className="relative group">
+                            <div className="w-24 h-24 rounded-[2.5rem] bg-slate-100 border-4 border-white shadow-xl overflow-hidden flex items-center justify-center">
+                                {userProfile.profileImage ? (
+                                    <img src={userProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <IconGallery className="w-8 h-8 text-slate-300" />
+                                )}
+                            </div>
+                            <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg cursor-pointer active:scale-90 transition-all border-4 border-white">
+                                <IconCamera className="w-4 h-4" />
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = async (event) => {
+                                                const base64 = event.target?.result as string;
+                                                const compressed = await compressImage(base64, 400, 0.7, true);
+                                                setUserProfile(prev => ({ ...prev, profileImage: compressed }));
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                />
+                            </label>
+                        </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Foto do Perfil</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                            <input 
+                                type="text" 
+                                value={userProfile.name}
+                                onChange={(e) => setUserProfile(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Seu nome"
+                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
+                            <input 
+                                type="text" 
+                                value={userProfile.cpf || ''}
+                                onChange={(e) => setUserProfile(prev => ({ ...prev, cpf: e.target.value }))}
+                                placeholder="000.000.000-00"
+                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => {
+                            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+                            addNotification('Perfil Atualizado', 'Suas informações foram salvas com sucesso.', 'success');
+                            setActiveModal(null);
+                        }}
+                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-[3px] text-[10px] active:scale-95 transition-all shadow-xl shadow-blue-600/20 mt-4"
+                    >
+                        Salvar Alterações
+                    </button>
                 </div>
             </Modal>
         )}

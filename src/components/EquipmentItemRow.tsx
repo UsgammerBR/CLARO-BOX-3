@@ -17,11 +17,13 @@ export interface EquipmentItemRowProps {
     isChristmas: boolean;
     onAddItem: () => void;
     onCollapse: () => void;
+    highlighted?: boolean;
 }
 
 export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({ 
     item, onUpdate, onDelete, onGallery, onCamera, deleteMode, 
-    selectedForDelete, onToggleSelect, onAddItem, onCollapse 
+    selectedForDelete, onToggleSelect, onAddItem, onCollapse,
+    highlighted 
 }) => {
     const serialRef = useRef<HTMLInputElement>(null);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -120,6 +122,7 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
 
     return (
         <motion.div 
+            id={`item-${item.id}`}
             layout
             variants={variants}
             initial="hidden"
@@ -127,7 +130,7 @@ export const EquipmentItemRow: React.FC<EquipmentItemRowProps> = ({
             exit="exit"
             className="flex gap-1.5 w-full"
         >
-            <div className={`flex-1 p-2 rounded-[1.2rem] border shadow-sm flex flex-col gap-2 transition-all duration-500 ${deleteMode && selectedForDelete?.includes(item.id) ? 'bg-red-50 border-red-100' : 'bg-white/40 border-slate-100/50 backdrop-blur-sm'}`}>
+            <div className={`flex-1 p-2 rounded-[1.2rem] border shadow-sm flex flex-col gap-2 transition-all duration-500 ${highlighted ? 'bg-yellow-50 border-yellow-200 ring-2 ring-yellow-200 ring-offset-2' : deleteMode && selectedForDelete?.includes(item.id) ? 'bg-red-50 border-red-100' : 'bg-white/40 border-slate-100/50 backdrop-blur-sm'}`}>
                 <div className="flex gap-1.5 items-center">
                     {deleteMode && (
                         <button 

@@ -17,6 +17,7 @@ interface EquipmentSectionProps {
     isChristmas: boolean;
     onAddItem: () => void;
     onCollapse: () => void;
+    highlightedItemId: string | null;
 }
 
 const isItemActive = (item: EquipmentItem): boolean => (item.contract && item.contract.trim() !== '') || (item.serial && item.serial.trim() !== '') || item.photos.length > 0;
@@ -24,7 +25,7 @@ const isItemActive = (item: EquipmentItem): boolean => (item.contract && item.co
 export const EquipmentSection = ({ 
     items, onUpdate, onDelete, onGallery, onCamera, 
     deleteMode, selectedForDelete, onToggleSelect, 
-    isChristmas, onAddItem, onCollapse 
+    isChristmas, onAddItem, onCollapse, highlightedItemId 
 }: EquipmentSectionProps) => {
     const sortedItems = [...items].sort((a, b) => {
         const aActive = isItemActive(a);
@@ -76,6 +77,7 @@ export const EquipmentSection = ({
                         isChristmas={isChristmas}
                         onAddItem={onAddItem}
                         onCollapse={onCollapse}
+                        highlighted={highlightedItemId === item.id}
                     />
                 ))}
             </AnimatePresence>
